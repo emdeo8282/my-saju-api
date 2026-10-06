@@ -20,7 +20,7 @@ class handler(BaseHTTPRequestHandler):
             lunar_month = calendar.lunarMonth
             lunar_day = calendar.lunarDay
             
-            ganji = calendar.getGapjaString()
+            ganji = calendar.getGapJaString()
             ganji_list = ganji.split()
             
             response_data = {
