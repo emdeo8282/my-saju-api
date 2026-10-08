@@ -4,11 +4,32 @@ import json
 import urllib.parse
 import re
 
-# 💡 시간에 따른 시주(時柱) 계산 함수
-def get_time_ganji(day_ganji, hour):
-    if not day_ganji or hour is None:
+def get_time_ganji(day_ganji, hour_str):
+    if not day_ganji or not hour_str:
         return ""
     
+    # 한글 시간명 매핑 (축시 -> 1시, 인시 -> 3시 등)
+    jiji_map = {
+        "자": 0, "축": 1, "인": 3, "묘": 5, "진": 7, "사": 9,
+        "오": 11, "미": 13, "신": 15, "유": 17, "술": 19, "해": 21
+    }
+    
+    hour = None
+    # 1. 한글 십이지시(자/축/인/묘...) 이름이 들어왔는지 확인
+    for name, h_val in jiji_map.items():
+        if name in str(hour_str):
+            hour = h_val
+            break
+            
+    # 2. 한글 이름이 없다면 숫자를 자동 추출
+    if hour is None:
+        numbers = re.findall(r'\d+', str(hour_str))
+        if numbers:
+            hour = int(numbers[0])
+
+    if hour is None:
+        return ""
+
     cheongan = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
     jiji = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
     
@@ -35,15 +56,8 @@ class handler(BaseHTTPRequestHandler):
             month = int(params.get('month', [1])[0])
             day = int(params.get('day', [1])[0])
             
-            # 💡 "축시 (01~03시)" 형태에서 숫자를 안전하게 추출하는 코드
-            hour_param = params.get('hour', [None])[0]
-            hour = None
-            if hour_param is not None and str(hour_param).strip() != "":
-                # 텍스트 내에서 모든 숫자 추출 (예: '01', '03')
-                numbers = re.findall(r'\d+', str(hour_param))
-                if numbers:
-                    # 첫 번째 숫자를 시간(hour)으로 변환 (예: 1)
-                    hour = int(numbers[0])
+            # hour 또는 birthtime 파라미터 수신
+            hour_param = params.get('hour', params.get('birthtime', [None]))[0]
 
             calendar = KoreanLunarCalendar()
             calendar.setSolarDate(year, month, day)
@@ -55,11 +69,10 @@ class handler(BaseHTTPRequestHandler):
             ganji = calendar.getGapJaString()
             ganji_list = ganji.split()
 
-            # "경진년", "기축월"처럼 뒤에 년/월/일이 붙어 나오는 경우 첫 글자만 사용
             raw_day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
-            day_ganji_clean = raw_day_ganji[0:2] # '신유일' -> '신유' 추출
+            day_ganji_clean = raw_day_ganji[0:2]
             
-            time_ganji = get_time_ganji(day_ganji_clean, hour)
+            time_ganji = get_time_ganji(day_ganji_clean, hour_param)
 
             response_data = {
                 "status": "success",
