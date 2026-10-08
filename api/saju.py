@@ -35,12 +35,14 @@ class handler(BaseHTTPRequestHandler):
             month = int(params.get('month', [1])[0])
             day = int(params.get('day', [1])[0])
             
-            # 안전한 hour 파라미터 숫자 추출
+            # 💡 "축시 (01~03시)" 형태에서 숫자를 안전하게 추출하는 코드
             hour_param = params.get('hour', [None])[0]
             hour = None
             if hour_param is not None and str(hour_param).strip() != "":
+                # 텍스트 내에서 모든 숫자 추출 (예: '01', '03')
                 numbers = re.findall(r'\d+', str(hour_param))
                 if numbers:
+                    # 첫 번째 숫자를 시간(hour)으로 변환 (예: 1)
                     hour = int(numbers[0])
 
             calendar = KoreanLunarCalendar()
@@ -53,8 +55,11 @@ class handler(BaseHTTPRequestHandler):
             ganji = calendar.getGapJaString()
             ganji_list = ganji.split()
 
-            day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
-            time_ganji = get_time_ganji(day_ganji, hour)
+            # "경진년", "기축월"처럼 뒤에 년/월/일이 붙어 나오는 경우 첫 글자만 사용
+            raw_day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
+            day_ganji_clean = raw_day_ganji[0:2] # '신유일' -> '신유' 추출
+            
+            time_ganji = get_time_ganji(day_ganji_clean, hour)
 
             response_data = {
                 "status": "success",
@@ -62,7 +67,7 @@ class handler(BaseHTTPRequestHandler):
                 "lunar": f"{lunar_year}-{lunar_month:02d}-{lunar_day:02d}",
                 "year_ganji": ganji_list[0] if len(ganji_list) > 0 else "",
                 "month_ganji": ganji_list[1] if len(ganji_list) > 1 else "",
-                "day_ganji": day_ganji,
+                "day_ganji": raw_day_ganji,
                 "time_ganji": time_ganji,
                 "raw_gapja": ganji
             }
