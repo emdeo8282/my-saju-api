@@ -2,28 +2,23 @@ from http.server import BaseHTTPRequestHandler
 from korean_lunar_calendar import KoreanLunarCalendar
 import json
 import urllib.parse
+import re
 
 # 💡 시간에 따른 시주(時柱) 계산 함수
 def get_time_ganji(day_ganji, hour):
     if not day_ganji or hour is None:
         return ""
     
-    # 천간과 지지 목록
     cheongan = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
     jiji = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
     
-    # 시간(0~23)에 해당하는 지지 인덱스 (자시: 23~01시 -> 0)
     jiji_idx = ((hour + 1) % 24) // 2
-    
-    # 일간(일주의 첫 글자) 찾기
     day_stem = day_ganji[0]
+    
     if day_stem not in cheongan:
         return ""
     
     stem_idx = cheongan.index(day_stem)
-    
-    # 일간에 따른 자시(子時)의 천간 시작점 계산 (시두법)
-    # 갑/기일 -> 갑자시(0), 을/경일 -> 병자시(2), 병/신일 -> 무자시(4), 정/임일 -> 경자시(6), 무/계일 -> 임자시(8)
     start_stem_idx = (stem_idx % 5) * 2
     time_stem_idx = (start_stem_idx + jiji_idx) % 10
     
@@ -40,9 +35,13 @@ class handler(BaseHTTPRequestHandler):
             month = int(params.get('month', [1])[0])
             day = int(params.get('day', [1])[0])
             
-            # 💡 hour 파라미터 추가 (기본값 None)
+            # 안전한 hour 파라미터 숫자 추출
             hour_param = params.get('hour', [None])[0]
-            hour = int(hour_param) if hour_param is not None and hour_param != "" else None
+            hour = None
+            if hour_param is not None and str(hour_param).strip() != "":
+                numbers = re.findall(r'\d+', str(hour_param))
+                if numbers:
+                    hour = int(numbers[0])
 
             calendar = KoreanLunarCalendar()
             calendar.setSolarDate(year, month, day)
@@ -55,8 +54,6 @@ class handler(BaseHTTPRequestHandler):
             ganji_list = ganji.split()
 
             day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
-            
-            # 💡 시주 계산 호출
             time_ganji = get_time_ganji(day_ganji, hour)
 
             response_data = {
@@ -66,7 +63,7 @@ class handler(BaseHTTPRequestHandler):
                 "year_ganji": ganji_list[0] if len(ganji_list) > 0 else "",
                 "month_ganji": ganji_list[1] if len(ganji_list) > 1 else "",
                 "day_ganji": day_ganji,
-                "time_ganji": time_ganji,  # 👈 시간 간지 결과 추가!
+                "time_ganji": time_ganji,
                 "raw_gapja": ganji
             }
 
