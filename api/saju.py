@@ -8,22 +8,25 @@ def get_time_ganji(day_ganji, hour_str):
     if not day_ganji or not hour_str:
         return ""
     
-    # 한글 시간명 매핑 (축시 -> 1시, 인시 -> 3시 등)
+    # URL 인코딩 문자열(%EC%B6%95...) 디코딩 처리
+    hour_str = urllib.parse.unquote(str(hour_str)).strip()
+    
+    # 한글 십이지시 매핑 (축시 -> 1시, 인시 -> 3시 등)
     jiji_map = {
         "자": 0, "축": 1, "인": 3, "묘": 5, "진": 7, "사": 9,
         "오": 11, "미": 13, "신": 15, "유": 17, "술": 19, "해": 21
     }
     
     hour = None
-    # 1. 한글 십이지시(자/축/인/묘...) 이름이 들어왔는지 확인
+    # 1. 한글 십이지시 이름 검색
     for name, h_val in jiji_map.items():
-        if name in str(hour_str):
+        if name in hour_str:
             hour = h_val
             break
             
-    # 2. 한글 이름이 없다면 숫자를 자동 추출
+    # 2. 숫자가 들어온 경우 추출
     if hour is None:
-        numbers = re.findall(r'\d+', str(hour_str))
+        numbers = re.findall(r'\d+', hour_str)
         if numbers:
             hour = int(numbers[0])
 
@@ -57,7 +60,7 @@ class handler(BaseHTTPRequestHandler):
             day = int(params.get('day', [1])[0])
             
             # hour 또는 birthtime 파라미터 수신
-            hour_param = params.get('hour', params.get('birthtime', [None]))[0]
+            hour_raw = params.get('hour', params.get('birthtime', ['']))[0]
 
             calendar = KoreanLunarCalendar()
             calendar.setSolarDate(year, month, day)
@@ -72,7 +75,7 @@ class handler(BaseHTTPRequestHandler):
             raw_day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
             day_ganji_clean = raw_day_ganji[0:2]
             
-            time_ganji = get_time_ganji(day_ganji_clean, hour_param)
+            time_ganji = get_time_ganji(day_ganji_clean, hour_raw)
 
             response_data = {
                 "status": "success",
