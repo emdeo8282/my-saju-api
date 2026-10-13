@@ -64,15 +64,23 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed_path = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed_path.query)
+        
+        # 디버깅용: Vercel 로그에서 실제로 어떤 값이 들어오는지 확인
+        print(f"DEBUG PARAMS: {params}")
 
         try:
-            year = int(params.get('year', [1990])[0])
-            month = int(params.get('month', [1])[0])
-            day = int(params.get('day', [1])[0])
+            # 대소문자나 다양한 키 이름에 대응할 수 있도록 안전하게 가져오기
+            year_val = params.get('year', params.get('Year', [1990]))[0]
+            month_val = params.get('month', params.get('Month', [1]))[0]
+            day_val = params.get('day', params.get('Day', [1]))[0]
+            
+            year = int(year_val)
+            month = int(month_val)
+            day = int(day_val)
             
             # hour 또는 birthtime 파라미터 수신
-            hour_raw = params.get('hour', params.get('birthtime', ['']))[0]
-
+            hour_raw = params.get('hour', params.get('Hour', params.get('birthtime', [''])))[0]
+            
             calendar = KoreanLunarCalendar()
             calendar.setSolarDate(year, month, day)
 
