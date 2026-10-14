@@ -8,7 +8,6 @@ def get_time_ganji(day_ganji, hour_str):
     if not day_ganji or not hour_str:
         return ""
     
-    # URL 인코딩 및 "시" 제거 처리
     hour_str = urllib.parse.unquote(str(hour_str)).strip()
     hour_str = hour_str.replace("시", "").strip()
     
@@ -48,22 +47,24 @@ def get_time_ganji(day_ganji, hour_str):
     
     return f"{cheongan[time_stem_idx]}{jiji[jiji_idx]}"
 
-def calculate_single_saju(year, month, day, hour_raw):
-    """사주 간지를 계산하는 단일 함수"""
+def calculate_saju(year_val, month_val, day_val, hour_val):
     try:
+        y = int(year_val)
+        m = int(month_val)
+        d = int(day_val)
+        
         calendar = KoreanLunarCalendar()
-        calendar.setSolarDate(int(year), int(month), int(day))
+        calendar.setSolarDate(y, m, d)
 
         ganji = calendar.getGapJaString()
         ganji_list = ganji.split()
 
         raw_day_ganji = ganji_list[2] if len(ganji_list) > 2 else ""
         day_ganji_clean = raw_day_ganji[0:2]
-        
-        time_ganji = get_time_ganji(day_ganji_clean, hour_raw)
+        time_ganji = get_time_ganji(day_ganji_clean, hour_val)
 
         return {
-            "solar": f"{year}-{int(month):02d}-{int(day):02d}",
+            "solar": f"{y}-{m:02d}-{d:02d}",
             "lunar": f"{calendar.lunarYear}-{calendar.lunarMonth:02d}-{calendar.lunarDay:02d}",
             "year_ganji": ganji_list[0] if len(ganji_list) > 0 else "",
             "month_ganji": ganji_list[1] if len(ganji_list) > 1 else "",
@@ -74,40 +75,40 @@ def calculate_single_saju(year, month, day, hour_raw):
     except Exception:
         return None
 
-
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed_path = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed_path.query)
 
         try:
-            # 1. 내 정보 추출 (self_ 또는 일반 파라미터 모두 지원)
-            year = params.get('year', params.get('self_year', [1990]))[0]
-            month = params.get('month', params.get('self_month', [1]))[0]
-            day = params.get('day', params.get('self_day', [1]))[0]
-            hour_raw = params.get('hour', params.get('birthtime', params.get('self_hour', [''])))[0]
+            # 내 정보: 어떤 파라미터 이름으로 들어오든 다 잡아냄 (우선순위 부여)
+            y = params.get('self_year', params.get('year', [1990]))[0]
+            m = params.get('self_month', params.get('month', [1]))[0]
+            d = params.get('self_day', params.get('day', [1]))[0]
+            h = params.get('self_hour', params.get('hour', params.get('birthtime', [''])) )[0]
 
-            self_saju = calculate_single_saju(year, month, day, hour_raw)
+            self_result = calculate_saju(y, m, d, h)
+            
+            # 만약 계산 실패 시 절대 기본값으로 안 빠지고 에러를 띄우도록 처리
+            if not self_result:
+                raise ValueError(f"Invalid self date parameters: {y}-{m}-{d}")
 
             response_data = {
                 "status": "success",
-                "self": self_saju
+                "self": self_result
             }
+            response_data.update(self_result) # 구버전 호환용 최상위 주입
 
-            # 구버전 호환성을 위해 최상위에도 내 사주 정보 포함시켜줌
-            if self_saju:
-                response_data.update(self_saju)
+            # 상대방 정보 확인
+            py = params.get('partner_year', params.get('p_year', [None]))[0]
+            pm = params.get('partner_month', params.get('p_month', [None]))[0]
+            pd = params.get('partner_day', params.get('p_day', [None]))[0]
+            ph = params.get('partner_hour', params.get('partner_birthtime', [None]))[0]
 
-            # 2. 상대방(partner) 정보가 존재할 경우에만 추가 계산
-            partner_year = params.get('partner_year', params.get('p_year', [None]))[0]
-            partner_month = params.get('partner_month', params.get('p_month', [None]))[0]
-            partner_day = params.get('partner_day', params.get('p_day', [None]))[0]
-            partner_hour = params.get('partner_hour', params.get('partner_birthtime', [None]))[0]
-
-            if partner_year and partner_month and partner_day:
-                partner_saju = calculate_single_saju(partner_year, partner_month, partner_day, partner_hour or '')
-                if partner_saju:
-                    response_data["partner"] = partner_saju
+            if py and pm and pd:
+                partner_result = calculate_saju(py, pm, pd, ph or '')
+                if partner_result:
+                    response_data["partner"] = partner_result
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
